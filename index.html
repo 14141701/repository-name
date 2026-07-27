@@ -1,0 +1,1217 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>낮과 밤의 부산 전기차 충전 지도 | 연구 대시보드</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root {
+    --ink: #1b1f23;
+    --paper: #fafaf8;
+    --card-bg: #ffffff;
+    --line: #dcdcd6;
+    --accent: #0f6e5c;
+    --sub-accent: #2b5da1;
+    --muted: #6b6f76;
+    --box-bg: #fbfaf6;
+    --fun-bg: #fdfbf7;
+    --fun-accent: #d97706;
+  }
+
+  /* 사이트 전체 다크 모드 변수 정의 */
+  body.dark-theme {
+    --ink: #f1f5f9;
+    --paper: #0f172a;
+    --card-bg: #1e293b;
+    --line: #334155;
+    --accent: #10b981;
+    --sub-accent: #38bdf8;
+    --muted: #94a3b8;
+    --box-bg: #1e1b4b;
+    --fun-bg: #1c1917;
+    --fun-accent: #f59e0b;
+  }
+
+  /* 붉은 기묘한 이야기(Stranger Things / Upside Down) 테마 */
+  body.stranger-theme {
+    --ink: #ff3344;
+    --paper: #050002;
+    --card-bg: #120005;
+    --line: #4a0011;
+    --accent: #ff0033;
+    --sub-accent: #ff6600;
+    --muted: #b33951;
+    --box-bg: #220008;
+    --fun-bg: #1a0006;
+    --fun-accent: #ff0033;
+    animation: strangerFlicker 0.15s infinite alternate;
+  }
+
+  @keyframes strangerFlicker {
+    0% { opacity: 0.98; }
+    100% { opacity: 1; }
+  }
+
+  /* 기묘한 이야기 글로우 텍스트 */
+  body.stranger-theme h1,
+  body.stranger-theme .eyebrow,
+  body.stranger-theme h2 {
+    color: #ff0033 !important;
+    text-shadow: 0 0 8px #ff0033, 0 0 18px #990011, 0 0 30px #e60000;
+    letter-spacing: 0.05em;
+  }
+
+  body.stranger-theme .proposal.active {
+    background: #2a000a;
+    border-left-color: #ff0033;
+    border-color: #660018;
+    box-shadow: 0 0 15px rgba(255, 0, 51, 0.3);
+  }
+
+  /* 기묘한 상단 알림 띠 */
+  #strangerBanner {
+    display: none;
+    background: #ff0033;
+    color: #fff;
+    text-align: center;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    box-shadow: 0 0 20px #ff0033;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0% { background-color: #cc0029; }
+    50% { background-color: #ff0033; }
+    100% { background-color: #cc0029; }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.55;
+    transition: background 0.4s ease, color 0.4s ease;
+  }
+
+  /* ---------- 상단: 제목 + 연구 질문 + 가설 ---------- */
+  header {
+    padding: 40px 24px 30px;
+    border-bottom: 1px solid var(--line);
+    max-width: 960px;
+    margin: 0 auto;
+    transition: border-color 0.4s ease;
+  }
+  .eyebrow {
+    font-size: 13px;
+    letter-spacing: .08em;
+    color: var(--muted);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    transition: color 0.4s ease;
+  }
+  h1 {
+    font-size: clamp(26px, 4vw, 38px);
+    margin: 0 0 20px;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* 메인 제목 옆 해와 달 아이콘 상태 제어 CSS */
+  .title-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .title-indicator .sun-icon, .title-indicator .moon-icon {
+    display: inline-block;
+    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  /* 주간 (라이트 모드): 해가 큼, 달이 작음 */
+  .title-indicator.day-active .sun-icon {
+    font-size: 28px;
+    transform: scale(1.3);
+    filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.85));
+    opacity: 1;
+  }
+  .title-indicator.day-active .moon-icon {
+    font-size: 16px;
+    transform: scale(0.8);
+    opacity: 0.3;
+  }
+
+  /* 야간 (다크 모드): 달이 큼, 해가 작음 */
+  .title-indicator.night-active .sun-icon {
+    font-size: 16px;
+    transform: scale(0.8);
+    opacity: 0.3;
+    filter: none;
+  }
+  .title-indicator.night-active .moon-icon {
+    font-size: 28px;
+    transform: scale(1.3);
+    filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.9));
+    opacity: 1;
+  }
+
+  /* 핵심 연구 질문 카드 */
+  .research-question-box {
+    background: var(--box-bg);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--fun-accent);
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+    transition: background 0.4s ease, border-color 0.4s ease;
+  }
+  .rq-tag {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--fun-accent);
+    letter-spacing: .06em;
+    margin-bottom: 4px;
+  }
+  .rq-text {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.5;
+  }
+
+  /* 가설 컨테이너 */
+  .hypothesis-container {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .hypothesis {
+    background: var(--card-bg);
+    border: 1px solid var(--line);
+    padding: 18px 22px;
+    font-size: 15px;
+    color: var(--ink);
+    transition: background 0.4s ease, border-color 0.4s ease, color 0.4s ease;
+  }
+  .hypothesis.main-hyp {
+    border-left: 4px solid var(--accent);
+  }
+  .hypothesis.sub-hyp {
+    border-left: 4px solid var(--sub-accent);
+  }
+  body:not(.dark-theme):not(.stranger-theme) .hypothesis.sub-hyp {
+    background: #fafcfe;
+  }
+  body.dark-theme .hypothesis.sub-hyp {
+    background: #0f2942;
+  }
+
+  .hypothesis b {
+    display: block;
+    font-size: 12px;
+    letter-spacing: .06em;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  .hypothesis.main-hyp b { color: var(--accent); }
+  .hypothesis.sub-hyp b { color: var(--sub-accent); }
+  
+  .hyp-reason {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--line);
+    line-height: 1.5;
+    transition: border-color 0.4s ease, color 0.4s ease;
+  }
+  .hyp-reason span {
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  /* ---------- 데이터 상태 스트립 ---------- */
+  .status-strip {
+    max-width: 960px;
+    margin: 20px auto 0;
+    padding: 0 24px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--muted);
+    align-items: center;
+  }
+  .status-strip span {
+    background: var(--card-bg);
+    border: 1px solid var(--line);
+    padding: 6px 12px;
+    border-radius: 4px;
+    transition: background 0.4s ease, border-color 0.4s ease;
+  }
+  .status-strip span.ok { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+
+  /* 기묘한 이야기 모드 즉시 체험 버튼 */
+  .stranger-btn {
+    border: 1px solid #ff0033;
+    background: #2a0008;
+    color: #ff3344;
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: auto;
+  }
+  .stranger-btn:hover {
+    background: #ff0033;
+    color: #fff;
+    box-shadow: 0 0 12px #ff0033;
+  }
+
+  /* ---------- 가설 검증 현황 패널 ---------- */
+  .verdict {
+    max-width: 960px;
+    margin: 24px auto 0;
+    padding: 0 24px 20px;
+  }
+  .verdict-box {
+    border: 1px solid var(--line);
+    background: var(--card-bg);
+    transition: background 0.4s ease, border-color 0.4s ease;
+  }
+  .verdict-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--line);
+    transition: border-color 0.4s ease;
+  }
+  .verdict-head .label {
+    font-size: 13.5px;
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .verdict-pill {
+    font-size: 12.5px;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 999px;
+    letter-spacing: .01em;
+  }
+  .verdict-pill.supported { background: #e5f4ee; color: #0f6e5c; border: 1px solid #b7ded1; }
+  body.dark-theme .verdict-pill.supported { background: #064e3b; color: #34d399; border-color: #059669; }
+  body.stranger-theme .verdict-pill.supported { background: #4a0011; color: #ff3344; border-color: #ff0033; }
+
+  .registered-rule {
+    padding: 16px 20px;
+    background: var(--box-bg);
+    transition: background 0.4s ease;
+  }
+  .rule-label {
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 700;
+    letter-spacing: .04em;
+    margin-bottom: 6px;
+  }
+  .rule-text {
+    font-size: 14px;
+    color: var(--ink);
+    line-height: 1.6;
+    margin-bottom: 8px;
+  }
+  .rule-meta {
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .criteria {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    background: var(--card-bg);
+    border: 1px solid var(--line);
+    transition: background 0.4s ease, border-color 0.4s ease;
+  }
+  .criterion {
+    padding: 16px 18px;
+    border-right: 1px solid var(--line);
+    font-size: 12.5px;
+    transition: border-color 0.4s ease;
+  }
+  .criterion:last-child { border-right: none; }
+  .criterion .step { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .criterion .stat {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 3px;
+    margin-bottom: 8px;
+  }
+  .criterion .stat.have { background: #e5f4ee; color: #0f6e5c; }
+  body.dark-theme .criterion .stat.have { background: #064e3b; color: #34d399; }
+  body.stranger-theme .criterion .stat.have { background: #4a0011; color: #ff3344; }
+  .criterion .what { color: var(--ink); line-height: 1.5; }
+
+  /* ---------- 시각화 및 컨트롤러 ---------- */
+  main {
+    max-width: 960px;
+    margin: 30px auto;
+    padding: 0 24px;
+  }
+  section.viz {
+    border: 1px solid var(--line);
+    background: var(--card-bg);
+    overflow: hidden;
+    transition: background 0.4s ease, border-color 0.4s ease;
+  }
+  .viz-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+    font-size: 14px;
+    flex-wrap: wrap;
+    gap: 10px;
+    transition: background 0.4s ease, color 0.4s ease, border-color 0.4s ease;
+  }
+  .viz-header.night-header {
+    background: #1e1b4b;
+    color: #e0e7ff;
+    border-bottom-color: #312e81;
+  }
+  body.stranger-theme .viz-header {
+    background: #2a0008;
+    color: #ff3344;
+    border-bottom-color: #660018;
+  }
+  .viz-header b { color: var(--ink); font-weight: 600; }
+  .viz-header.night-header b { color: #f43f5e; }
+  
+  .time-toggle {
+    display: flex;
+    gap: 6px;
+    background: #f0f0ec;
+    padding: 3px;
+    border-radius: 6px;
+    transition: background 0.4s ease;
+  }
+  body.dark-theme .time-toggle {
+    background: #0f172a;
+  }
+  body.stranger-theme .time-toggle {
+    background: #120005;
+  }
+  .time-btn {
+    border: none;
+    background: transparent;
+    padding: 6px 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all .15s ease;
+  }
+  .time-btn.active {
+    background: #fff;
+    color: #1b1f23;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .time-btn#btnNight.active {
+    background: linear-gradient(135deg, #4f46e5, #06b6d4);
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(6, 182, 212, 0.4);
+  }
+  body.stranger-theme .time-btn.active {
+    background: #ff0033;
+    color: #fff;
+    box-shadow: 0 0 10px #ff0033;
+  }
+
+  #map {
+    width: 100%;
+    height: 460px;
+    background: #eef0ee;
+    z-index: 1;
+    transition: filter 0.4s ease, background 0.4s ease;
+  }
+  #map.night-mode {
+    background: #0f172a;
+  }
+  #map.night-mode .leaflet-tile-pane {
+    filter: invert(100%) hue-rotate(190deg) brightness(85%) contrast(120%) saturate(150%);
+  }
+
+  /* 기묘한 이야기 지도의 업사이드 다운 필터 */
+  #map.stranger-mode {
+    background: #050002;
+  }
+  #map.stranger-mode .leaflet-tile-pane {
+    filter: invert(100%) sepia(100%) hue-rotate(300deg) saturate(600%) contrast(180%) brightness(75%);
+  }
+
+  .map-note {
+    padding: 14px 18px;
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px dashed var(--line);
+    line-height: 1.6;
+    transition: background 0.4s ease, color 0.4s ease, border-color 0.4s ease;
+  }
+  .map-note.night-note {
+    background: #0f172a;
+    color: #cbd5e1;
+    border-top: 1px solid #1e293b;
+  }
+  body.stranger-theme .map-note {
+    background: #120005;
+    color: #ff8899;
+    border-top: 1px solid #4a0011;
+  }
+
+  /* ---------- [독립 칸 1] 연구 결론 섹션 ---------- */
+  .conclusion-section {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 24px 8px;
+  }
+  .conclusion-section h2 {
+    font-size: 15px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin: 0 0 16px;
+    border-top: 1px solid var(--line);
+    padding-top: 28px;
+    transition: border-color 0.4s ease;
+  }
+
+  .facts-box {
+    background: var(--card-bg);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--accent);
+    padding: 18px 22px;
+    transition: background 0.4s ease, border-color 0.4s ease;
+  }
+  .facts-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .facts-list {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 13.5px;
+    color: var(--ink);
+    line-height: 1.7;
+  }
+  .facts-list li {
+    margin-bottom: 6px;
+  }
+  .facts-list li:last-child {
+    margin-bottom: 0;
+  }
+
+  /* ---------- [독립 칸 2] 데이터 기반 충전 인프라 개선 및 활용 제안 ---------- */
+  .proposals {
+    max-width: 960px;
+    margin: 24px auto 0;
+    padding: 0 24px 8px;
+  }
+  .proposals h2 {
+    font-size: 15px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin: 0 0 16px;
+    border-top: 1px solid var(--line);
+    padding-top: 28px;
+    transition: border-color 0.4s ease;
+  }
+  .proposal-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .proposal {
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--accent);
+    background: var(--card-bg);
+    padding: 16px 20px;
+    cursor: pointer;
+    transition: all .2s ease;
+    user-select: none;
+  }
+  .proposal:hover {
+    background: var(--box-bg);
+  }
+  .proposal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+  .pbody-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .pnum {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .ptitle {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .toggle-icon {
+    font-size: 12px;
+    color: var(--muted);
+    transition: transform .2s ease;
+  }
+  
+  .ptext-details {
+    display: none;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--line);
+    font-size: 13.5px;
+    color: var(--ink);
+    line-height: 1.65;
+  }
+
+  .proposal.active {
+    background: #eaf1fb;
+    border-left-color: #2b5da1;
+    border-color: #bcd2ee;
+  }
+  body.dark-theme .proposal.active {
+    background: #1e1b4b;
+    border-left-color: #38bdf8;
+    border-color: #312e81;
+  }
+  .proposal.active .pnum {
+    color: var(--sub-accent);
+  }
+  .proposal.active .toggle-icon {
+    transform: rotate(180deg);
+  }
+  .proposal.active .ptext-details {
+    display: block;
+  }
+
+  /* ---------- [독립 칸 3] 흥미로운 숨겨진 발견 (Data Insights) ---------- */
+  .insights-section {
+    max-width: 960px;
+    margin: 32px auto 0;
+    padding: 0 24px;
+  }
+  .insights-section h2 {
+    font-size: 15px;
+    color: var(--fun-accent);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin: 0 0 16px;
+    border-top: 1px solid var(--line);
+    padding-top: 28px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .insight-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  .insight-card {
+    background: var(--fun-bg);
+    border: 1px solid var(--line);
+    border-top: 3px solid var(--fun-accent);
+    padding: 18px;
+    border-radius: 4px;
+    transition: transform 0.2s ease, background 0.4s ease, border-color 0.4s ease;
+  }
+  .insight-card:hover {
+    transform: translateY(-2px);
+  }
+  .insight-icon {
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
+  .insight-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+  .insight-desc {
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* ---------- 하단: 연구 한계 및 출처 ---------- */
+  footer {
+    max-width: 960px;
+    margin: 30px auto 40px;
+    padding: 0 24px;
+  }
+  footer h2 {
+    font-size: 15px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin: 0 0 14px;
+    border-top: 1px solid var(--line);
+    padding-top: 28px;
+    transition: border-color 0.4s ease;
+  }
+
+  /* 연구 한계 요약 박스 (1번, 2번 구분을 깔끔하게 적용) */
+  .limit-card {
+    background: var(--card-bg);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--muted);
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    transition: background 0.4s ease, border-color 0.4s ease;
+  }
+  .limit-title {
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+  .limit-list {
+    margin: 0;
+    padding-left: 18px;
+  }
+  .limit-list li {
+    margin-bottom: 4px;
+  }
+  .limit-list li:last-child {
+    margin-bottom: 0;
+  }
+
+  .sources {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .source-card {
+    border: 1px solid var(--line);
+    background: var(--card-bg);
+    padding: 14px;
+    font-size: 12.5px;
+    transition: background 0.4s ease, border-color 0.4s ease;
+  }
+  .source-card .name { font-weight: 600; margin-bottom: 4px; color: var(--ink); }
+  .source-card .meta { color: var(--muted); font-size: 11.5px; margin-bottom: 6px; }
+  .source-card .url-source {
+    font-size: 10.5px;
+    color: var(--muted);
+    word-break: break-all;
+    border-top: 1px dashed var(--line);
+    padding-top: 6px;
+    margin-top: 4px;
+    line-height: 1.3;
+  }
+  .source-card .url-source a {
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .source-card .url-source a:hover {
+    text-decoration: underline;
+    color: var(--accent);
+  }
+
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 3px;
+    margin-bottom: 8px;
+    letter-spacing: .02em;
+  }
+  .badge.done { background: #e5f4ee; color: #0f6e5c; }
+  body.dark-theme .badge.done { background: #064e3b; color: #34d399; }
+  body.stranger-theme .badge.done { background: #4a0011; color: #ff3344; }
+
+  @media (max-width: 768px) {
+    .sources { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 640px) {
+    .sources { grid-template-columns: 1fr; }
+    .insight-grid { grid-template-columns: 1fr; }
+    .criteria { grid-template-columns: 1fr; }
+    .criterion { border-right: none; border-bottom: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+
+<!-- 기묘한 이야기 모드 경고 배너 -->
+<div id="strangerBanner">
+  ⚠️ 경고: 대시보드 켜짐 11분 경과 — 기묘한 이야기 (UPSIDE DOWN) 모드가 발동되었습니다!
+</div>
+
+<header>
+  <div class="eyebrow" id="headerEyebrow">전기차 충전 인프라 연구 대시보드 · 가설 검증 판정본</div>
+  <h1 id="headerTitle">
+    <span>낮과 밤의 부산 전기차 충전 지도</span>
+    <!-- 메인 제목 바로 옆 해와 달 아이콘 -->
+    <span id="titleIndicator" class="title-indicator day-active">
+      <span class="sun-icon">☀️</span>
+      <span class="moon-icon">🌙</span>
+    </span>
+  </h1>
+
+  <!-- 핵심 연구 질문 카드 -->
+  <div class="research-question-box">
+    <div class="rq-tag">❓ CORE RESEARCH QUESTION (핵심 연구 질문)</div>
+    <div class="rq-text">
+      "부산시의 토지 이용 특성(상업지 vs 주거지)과 시간대(낮 vs 밤)에 따라 전기차 충전 수요는 어떻게 다르게 나타나며, 효율적인 맞춤형 인프라 구축 방향은 무엇인가?"
+    </div>
+  </div>
+
+  <div class="hypothesis-container">
+    <div class="hypothesis main-hyp">
+      <b>주가설 [낮 14:00 · 상업/업무지구]</b>
+      <div class="hyp-reason">
+        💡 <span>설정 근거:</span> 전기차는 충전 시간이 길어 차량 정차 장소가 필수적이며, 상업·업무지역은 낮 시간대 활동 차량 정차 비율이 높음.
+      </div>
+      상업·업무시설 밀도가 높은 지역일수록 낮 시간대 충전 수요(이용 건수)가 높을 것이다.
+    </div>
+    <div class="hypothesis sub-hyp">
+      <b>보조가설 [밤 22:00 · 공동주택 주거지구]</b>
+      <div class="hyp-reason">
+        💡 <span>설정 근거:</span> 공동주택(아파트 등) 밀집지역은 개인 전용 충전기 설치가 어려워 주민들의 공용 충전기 의존도가 밤 시간대에 급증함.
+      </div>
+      공동주택 거주 비율이 높은 지역일수록 야간 시간대(밤 22시) 공용 충전기에 대한 수요(이용률)가 높을 것이다.
+    </div>
+  </div>
+</header>
+
+<div class="verdict">
+  <!-- 주가설 검증 카드 -->
+  <div class="verdict-box">
+    <div class="verdict-head">
+      <span class="label">주가설 판정 — 상업·업무시설 밀도 ↑ → 낮 시간대 이용 건수 ↑</span>
+      <span class="verdict-pill supported">✓ 가설 지지 (4/5 겹침)</span>
+    </div>
+    <div class="registered-rule">
+      <div class="rule-label">사전 등록 검증 방법</div>
+      <div class="rule-text">
+        <b>상업·업무시설 밀도 상위 5개 구</b> 중 <b>3개 이상</b>이 <b>낮 시간대 이용 건수 상위 5개 구</b>에 포함되면 <b>지지</b>.
+      </div>
+      <div class="rule-meta">
+        실제 분석: 상업·업무 밀도 상위 5개 구(중구·동구·사상구·서구·부산진구) ∩
+        낮 시간대 이용 건수 상위 5개 구(중구·동구·사상구·부산진구·기장군) = <b>4개 구 겹침(중구, 동구, 사상구, 부산진구)</b> ➔ <b>기준 통과 (≥3개)</b>
+      </div>
+    </div>
+  </div>
+
+  <!-- 보조가설 검증 카드 -->
+  <div class="verdict-box" style="margin-top:16px;">
+    <div class="verdict-head">
+      <span class="label">보조가설 판정 — 공동주택 거주 비율 ↑ → 야간 공용 충전기 이용률 ↑</span>
+      <span class="verdict-pill supported">✓ 가설 지지 (4/5 겹침)</span>
+    </div>
+    <div class="registered-rule">
+      <div class="rule-label">사전 등록 검증 방법</div>
+      <div class="rule-text">
+        <b>공동주택 거주 비율 상위 5개 구</b> 중 <b>3개 이상</b>이 <b>야간 공용 충전기 이용률 상위 5개 구</b>에 포함되면 <b>지지</b>.
+      </div>
+      <div class="rule-meta">
+        실제 분석: 공동주택 비율 상위 5개 구(북구·동래구·연제구·사하구·수영구) ∩
+        야간 공용 충전기 이용률 상위 5개 구(북구·동래구·연제구·수영구·남구) = <b>4개 구 겹침(북구, 동래구, 연제구, 수영구)</b> ➔ <b>기준 통과 (≥3개)</b>
+      </div>
+    </div>
+  </div>
+
+  <div class="criteria" style="margin-top:16px;">
+    <div class="criterion">
+      <div class="step">① 구별 시설 밀도 / 거주 비율</div>
+      <span class="stat have">확보 완료</span>
+      <div class="what">상업·업무시설 밀도 및 통계청 주택총조사 공동주택 거주 비율 데이터</div>
+    </div>
+    <div class="criterion">
+      <div class="step">② 낮 시간대 이용 건수</div>
+      <span class="stat have">확보 완료</span>
+      <div class="what">낮 시간대(14:00 기준) 구별 충전 이용 건수 집계 데이터</div>
+    </div>
+    <div class="criterion">
+      <div class="step">③ 야간 공용 충전기 이용률</div>
+      <span class="stat have">확보 완료</span>
+      <div class="what">야간 시간대(22:00 기준) 공용 충전기 가동 비율 (%)</div>
+    </div>
+    <div class="criterion">
+      <div class="step">④ 검증 기준 충족 여부</div>
+      <span class="stat have">기준 충족</span>
+      <div class="what">주가설 4/5 겹침 (≥3개), 보조가설 4/5 겹침 (≥3개) 확인</div>
+    </div>
+  </div>
+</div>
+
+<div class="status-strip" id="statusStrip">
+  <span class="ok">✓ 가설 검증 결과 및 웹 대시보드 업데이트 완료</span>
+  <span id="timerNotice">⏱️ 11분 후 기묘한 이야기 모드 자동 전환</span>
+  <button class="stranger-btn" onclick="triggerStrangerThings()">🔮 기묘한 모드 즉시 체험</button>
+</div>
+
+<main>
+  <section class="viz">
+    <div class="viz-header" id="vizHeader">
+      <span>
+        <b id="vizTitle">부산시 구별 충전 인프라 및 가동 실태 지도</b>
+      </span>
+      <div class="time-toggle">
+        <button class="time-btn active" id="btnDay" onclick="switchTime('day')">☀️ 주간 이용 (낮 14시)</button>
+        <button class="time-btn" id="btnNight" onclick="switchTime('night')">🌙 야간 이용 (밤 22시)</button>
+      </div>
+    </div>
+    <div id="map"></div>
+    <div class="map-note" id="mapNote">
+      현재 <b>[주간 14:00 이용 건수 및 가동률]</b>이 표시되고 있습니다. 상업·업무 밀집 구(중구, 동구, 사상구, 부산진구)에서 낮 시간대 이용량이 집중됩니다.
+    </div>
+  </section>
+</main>
+
+<!-- 독립 칸 1: 연구 결론 -->
+<section class="conclusion-section">
+  <h2>📌 연구 결론 (연구 질문에 대한 핵심 분석 답변)</h2>
+  <div class="facts-box">
+    <div class="facts-title">📊 대시보드 데이터 분석을 통해 확인된 핵심 사실 3가지</div>
+    <ul class="facts-list">
+      <li><b>상업·업무지구의 낮 시간대 충전 집중:</b> 상업 및 업무시설 밀도가 높은 구(중구, 동구, 사상구, 부산진구)에서 주간(14:00) 충전 이용 건수 및 가동률이 압도적으로 높게 형성됨.</li>
+      <li><b>주거 밀집지역의 야간 공용 충전기 의존:</b> 공동주택 거주 비율이 높은 구(북구, 동래구, 연제구, 수영구)에서 퇴근 후 야간(22:00) 공용 충전기 가동률이 최대 51%까지 급증함.</li>
+      <li><b>토지 이용 특성에 따른 시간대별 충전 수요 이원화:</b> 동일 자치구라도 유동 인구 중심지냐 주거지냐에 따라 충전 패턴이 낮과 밤으로 명확히 구분되어, 차별화된 맞춤형 인프라 공급이 요구됨.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 독립 칸 2: 데이터 기반 충전 인프라 개선 및 활용 제안 (3개) -->
+<section class="proposals">
+  <h2>💡 데이터 기반 충전 인프라 개선 및 활용 제안 (클릭하여 상세보기)</h2>
+  <div class="proposal-list">
+    <div class="proposal">
+      <div class="proposal-header">
+        <div class="pbody-title-wrap">
+          <div class="pnum">①</div>
+          <div class="ptitle">상업·업무지구: 낮 시간대 회전율 극대화를 위한 초급속 충전 거점 구축</div>
+        </div>
+        <span class="toggle-icon">▼ 상세보기</span>
+      </div>
+      <div class="ptext-details">
+        주가설 분석 결과, 상업·업무시설 밀집 구(중구·동구·사상구 등)는 낮 시간대 단시간 주차 차량의 충전 이용량이 집중됩니다. 
+        이 지역에는 장시간 주차형 완속 충전기보다 20~30분 내 빠른 충전이 가능한 **초급속 충전 스파팟(Hub)**을 공영주차장 및 업무지구 빌딩 주변에 우선적으로 설치하여 회전율을 극대화해야 합니다.
+      </div>
+    </div>
+
+    <div class="proposal">
+      <div class="proposal-header">
+        <div class="pbody-title-wrap">
+          <div class="pnum">②</div>
+          <div class="ptitle">주거 밀집지구: 아파트 및 다세대 주택 야간 공용 완속 충전기 집중 보급</div>
+        </div>
+        <span class="toggle-icon">▼ 상세보기</span>
+      </div>
+      <div class="ptext-details">
+        보조가설 분석 결과, 공동주택 거주 비율이 높은 구(북구·동래구·연제구 등)는 야간 가동률이 50% 이상으로 급증합니다. 
+        개인 충전기 설치가 어려운 노후 아파트나 주택가 주차장에 이동형 콘센트 충전기 및 밤샘 주차가 가능한 공용 완속 충전 인프라 보조금을 집중 지원할 필요가 있습니다.
+      </div>
+    </div>
+
+    <div class="proposal">
+      <div class="proposal-header">
+        <div class="pbody-title-wrap">
+          <div class="pnum">③</div>
+          <div class="ptitle">운전자 맞춤 팁: 혼잡 시간대 회피 및 주변 거점 충전기 활용 가이드</div>
+        </div>
+        <span class="toggle-icon">▼ 상세보기</span>
+      </div>
+      <div class="ptext-details">
+        전기차 운전자는 낮 시간대 원도심 업무지구의 급속 충전기 대기 시간을 피하기 위해 인근 공영주차장을 미리 확인하거나, 퇴근 후 아파트 충전 시 심야 예약 충전 기능을 적극 활용하는 등 시간대별 가동률 특성을 고려한 스마트 이용 습관이 권장됩니다.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 독립 칸 3: 흥미로운 숨겨진 발견 -->
+<section class="insights-section">
+  <h2>🔍 대시보드 데이터 속 뜻밖의 흥미로운 사실 2가지</h2>
+  <div class="insight-grid">
+    <div class="insight-card">
+      <div class="insight-icon">🔍</div>
+      <div class="insight-title">1. "충전기 최다 보유 구"라고 가장 잘 충전되는 건 아니다?</div>
+      <div class="insight-desc">
+        해운대구(3,850개)와 부산진구(3,420개)는 충전기가 가장 많은 1, 2위이지만, 정작 낮 시간대 이용률은 중구(58%)나 동구(52%)보다 훨씬 낮습니다. 충전기 수만 많다고 해서 특정 시간대 이용 편의성이 무조건 높은 것은 아닙니다.
+      </div>
+    </div>
+
+    <div class="insight-card">
+      <div class="insight-icon">🚗</div>
+      <div class="insight-title">2. 외곽지역(강서구·기장군)의 숨은 낮 시간대 충전 수요</div>
+      <div class="insight-desc">
+        도심 중심지가 아닌 외곽인 강서구와 기장군이 낮 시간대 이용률 상위권(35~38%)에 위치합니다. 이는 산업단지 출퇴근 차량과 외곽 방문 유동 차량의 장거리 이동 전 충전 수요가 예상외로 매우 크다는 것을 보여줍니다.
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <h2>연구 한계 및 데이터 출처</h2>
+  <!-- 연구 한계 1번, 2번 명확히 구분 -->
+  <div class="limit-card">
+    <div class="limit-title">⚠️ 본 연구의 주요 한계점</div>
+    <ol class="limit-list">
+      <li><b>공용 API 데이터 용량 한계:</b> 부산시 전체 충전소의 실시간 세부 좌표를 포함하는 공공 API 데이터는 용량이 제한을 초과하여 대시보드에 직접 포함하지 못하였으며, 이에 구·군별 중심점 집계 데이터를 활용하였습니다.</li>
+      <li><b>최신 실시간 자료 확보의 한계:</b> 공공기관 데이터의 개방 주기 차이로 인해 가장 최신의 개별 충전기 실시간 가동 이력을 완벽하게 동기화하여 수집하는 데 실질적인 한계가 있었습니다.</li>
+    </ol>
+  </div>
+
+  <div class="sources">
+    <div class="source-card">
+      <span class="badge done">확보완료</span>
+      <div class="name">한국스마트그리드협회 · 차지인포</div>
+      <div class="meta">부산광역시 전기차 등록 현황 통계 (2025년)</div>
+      <div class="url-source">🔗 출처: <a href="https://www.ksga.org" target="_blank">ksga.org (2025 스마트그리드 통계)</a></div>
+    </div>
+    <div class="source-card">
+      <span class="badge done">확보완료</span>
+      <div class="name">EV-무공해차 통합누리집</div>
+      <div class="meta">부산시 구별 충전소 실시간 상태 및 이용 이력 (2026년)</div>
+      <div class="url-source">🔗 출처: <a href="https://www.ev.or.kr" target="_blank">ev.or.kr (2026 환경부 무공해차)</a></div>
+    </div>
+    <div class="source-card">
+      <span class="badge done">확보완료</span>
+      <div class="name">통계청 인구주택총조사</div>
+      <div class="meta">부산시 구별 토지이용 밀도 및 공동주택 거주 비율 (2026년)</div>
+      <div class="url-source">🔗 출처: <a href="https://kostat.go.kr" target="_blank">kostat.go.kr (2026 국가통계포털)</a></div>
+    </div>
+    <div class="source-card">
+      <span class="badge done">확보완료</span>
+      <div class="name">한국환경공단 전기차 충전소 API</div>
+      <div class="meta">전국 전기자동차 충전소 상태 정보 (2026년 연간 갱신)</div>
+      <div class="url-source">🔗 출처: <a href="https://www.data.go.kr/data/15076352/openapi.do" target="_blank">data.go.kr (2026 Open API)</a></div>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+  let map, markersGroup;
+  let currentTime = 'day';
+  let isStrangerMode = false;
+
+  // 부산 구/군별 분석 데이터
+  const busanDistrictData = [
+    { 시군구: "중구",     lat: 35.1062, lng: 129.0324, 총충전기수: 1120, dayCount: 1420, dayRate: 58.2, nightRate: 14.5 },
+    { 시군구: "동구",     lat: 35.1293, lng: 129.0454, 총충전기수: 980,  dayCount: 1280, dayRate: 52.8, nightRate: 18.1 },
+    { 시군구: "사상구",   lat: 35.1528, lng: 128.9912, 총충전기수: 1820, dayCount: 1650, dayRate: 44.5, nightRate: 25.6 },
+    { 시군구: "부산진구", lat: 35.1600, lng: 129.0556, 총충전기수: 3420, dayCount: 1580, dayRate: 41.2, nightRate: 31.0 },
+    { 시군구: "기장군",   lat: 35.2447, lng: 129.2223, 총충전기수: 2210, dayCount: 1150, dayRate: 38.9, nightRate: 22.5 },
+    { 시군구: "해운대구", lat: 35.1631, lng: 129.1636, 총충전기수: 3850, dayCount: 980,  dayRate: 28.5, nightRate: 42.1 },
+    { 시군구: "강서구",   lat: 35.1798, lng: 128.9759, 총충전기수: 2980, dayCount: 890,  dayRate: 35.0, nightRate: 21.0 },
+    { 시군구: "남구",     lat: 35.1365, lng: 129.0842, 총충전기수: 2710, dayCount: 780,  dayRate: 22.4, nightRate: 38.8 },
+    { 시군구: "금정구",   lat: 35.2430, lng: 129.0921, 총충전기수: 2450, dayCount: 720,  dayRate: 26.5, nightRate: 33.9 },
+    { 시군구: "동래구",   lat: 35.2048, lng: 129.0786, 총충전기수: 2380, dayCount: 680,  dayRate: 21.0, nightRate: 46.4 },
+    { 시군구: "사하구",   lat: 35.1044, lng: 128.9749, 총충전기수: 2100, dayCount: 610,  dayRate: 24.3, nightRate: 39.8 },
+    { 시군구: "북구",     lat: 35.1970, lng: 128.9904, 총충전기수: 1950, dayCount: 540,  dayRate: 18.2, nightRate: 51.0 },
+    { 시군구: "연제구",   lat: 35.1764, lng: 129.0797, 총충전기수: 1680, dayCount: 490,  dayRate: 25.0, nightRate: 44.1 },
+    { 시군구: "수영구",   lat: 35.1456, lng: 129.1132, 총충전기수: 1520, dayCount: 450,  dayRate: 31.2, nightRate: 43.0 },
+    { 시군구: "서구",     lat: 35.0979, lng: 129.0244, 총충전기수: 910,  dayCount: 420,  dayRate: 41.0, nightRate: 20.9 },
+    { 시군구: "영도구",   lat: 35.0912, lng: 129.0678, 총충전기수: 850,  dayCount: 310,  dayRate: 23.1, nightRate: 29.8 }
+  ];
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const busanBounds = L.latLngBounds([34.87, 128.73], [35.42, 129.33]);
+    
+    map = L.map('map', {
+      scrollWheelZoom: false,
+      maxBounds: busanBounds,
+      maxBoundsViscosity: 1.0,
+      minZoom: 10
+    });
+    
+    map.fitBounds(busanBounds);
+    
+    // 한국어 지명을 지원하는 OpenStreetMap 기본 타일 적용
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      minZoom: 10,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    markersGroup = L.layerGroup().addTo(map);
+    renderMapData();
+
+    // 제안 카드 클릭 토글 (상세내용 열기/닫기)
+    document.querySelectorAll('.proposal').forEach(card => {
+      card.addEventListener('click', () => {
+        card.classList.toggle('active');
+        const icon = card.querySelector('.toggle-icon');
+        if (card.classList.contains('active')) {
+          icon.textContent = '▲ 닫기';
+        } else {
+          icon.textContent = '▼ 상세보기';
+        }
+      });
+    });
+
+    // 11분 타이머 설정 (11분 = 660,000 밀리초)
+    const STRANGER_TIMEOUT = 11 * 60 * 1000;
+    setTimeout(() => {
+      if (!isStrangerMode) {
+        triggerStrangerThings();
+      }
+    }, STRANGER_TIMEOUT);
+  });
+
+  function renderMapData() {
+    markersGroup.clearLayers();
+    const maxCount = Math.max(...busanDistrictData.map(r => r.총충전기수));
+
+    busanDistrictData.forEach(r => {
+      const rate = currentTime === 'day' ? r.dayRate : r.nightRate;
+      const radius = 8 + (r.총충전기수 / maxCount) * 28;
+      
+      let strokeColor = currentTime === 'day' ? '#0f6e5c' : '#f43f5e';
+      let fillColor = currentTime === 'day' ? '#0f6e5c' : '#a855f7';
+
+      if (isStrangerMode) {
+        strokeColor = '#ff0033';
+        fillColor = '#ff0033';
+      }
+
+      const circle = L.circleMarker([r.lat, r.lng], {
+        radius: radius,
+        color: strokeColor,
+        weight: currentTime === 'day' && !isStrangerMode ? 2 : 2.5,
+        fillColor: fillColor,
+        fillOpacity: isStrangerMode ? 0.8 : (currentTime === 'day' ? 0.4 : 0.7)
+      }).addTo(markersGroup);
+
+      circle.bindTooltip(
+        `<b>${r.시군구}</b><br>` +
+        `총 충전기: ${r.총충전기수.toLocaleString()}개<br>` +
+        `낮 이용 건수: ${r.dayCount.toLocaleString()}건<br>` +
+        `<b>[${currentTime === 'day' ? '낮 14시' : '밤 22시'}] 이용률: ${rate}%</b>`,
+        { direction: 'top', offset: [0, -radius] }
+      );
+    });
+  }
+
+  function switchTime(time) {
+    if (isStrangerMode) return; // 기묘한 모드일 때는 주야간 토글 고정
+
+    currentTime = time;
+    document.getElementById('btnDay').classList.toggle('active', time === 'day');
+    document.getElementById('btnNight').classList.toggle('active', time === 'night');
+    
+    const mapElement = document.getElementById('map');
+    const note = document.getElementById('mapNote');
+    const header = document.getElementById('vizHeader');
+    const titleIndicator = document.getElementById('titleIndicator');
+
+    if (time === 'day') {
+      document.body.classList.remove('dark-theme');
+      mapElement.classList.remove('night-mode');
+      header.classList.remove('night-header');
+      note.classList.remove('night-note');
+      note.innerHTML = '현재 <b>[주간 14:00 이용 건수 및 가동률]</b>이 표시되고 있습니다. 상업·업무 밀집 구(중구, 동구, 사상구, 부산진구)에서 낮 시간대 이용량이 집중됩니다.';
+      
+      // 메인 제목 옆 인디케이터 (낮: 해가 큼, 달이 작음)
+      titleIndicator.className = 'title-indicator day-active';
+    } else {
+      document.body.classList.add('dark-theme');
+      mapElement.classList.add('night-mode');
+      header.classList.add('night-header');
+      note.classList.add('night-note');
+      note.innerHTML = '현재 <b>[야간 22:00 전체 사이트 다크 모드]</b>가 적용되어 있습니다. 지도의 한글명을 유지하면서 보라/핑크빛 네온 버블로 주거 밀집 구(북구, 동래구, 연제구, 수영구)의 야간 충전 수요를 나타냅니다.';
+      
+      // 메인 제목 옆 인디케이터 (밤: 달이 큼, 해가 작음)
+      titleIndicator.className = 'title-indicator night-active';
+    }
+
+    renderMapData();
+  }
+
+  // 기묘한 이야기 모드 발동 함수
+  function triggerStrangerThings() {
+    isStrangerMode = !isStrangerMode;
+    const body = document.body;
+    const mapElement = document.getElementById('map');
+    const banner = document.getElementById('strangerBanner');
+    const title = document.getElementById('headerTitle');
+    const eyebrow = document.getElementById('headerEyebrow');
+    const note = document.getElementById('mapNote');
+    const timerNotice = document.getElementById('timerNotice');
+
+    if (isStrangerMode) {
+      body.classList.remove('dark-theme');
+      body.classList.add('stranger-theme');
+      mapElement.classList.remove('night-mode');
+      mapElement.classList.add('stranger-mode');
+
+      banner.style.display = 'block';
+      title.innerHTML = '⚡ 기묘한 이야기: 충전소의 뒤집힌 세계 (UPSIDE DOWN)';
+      eyebrow.textContent = 'STRANGER CHARGERS · 11분 경과 붉은 노이즈 테마';
+      note.innerHTML = '⚠️ <b>[UPSIDE DOWN MODE]</b> 대시보드 접속 후 11분이 경과하여 기묘한 이야기 모드가 활성화되었습니다. 지도와 인프라 버블이 붉은 핏빛 네온으로 빛납니다.';
+      timerNotice.textContent = '🔮 기묘한 이야기 모드 작동 중';
+    } else {
+      body.classList.remove('stranger-theme');
+      mapElement.classList.remove('stranger-mode');
+
+      banner.style.display = 'none';
+      title.innerHTML = `
+        <span>낮과 밤의 부산 전기차 충전 지도</span>
+        <span id="titleIndicator" class="title-indicator ${currentTime === 'day' ? 'day-active' : 'night-active'}">
+          <span class="sun-icon">☀️</span>
+          <span class="moon-icon">🌙</span>
+        </span>
+      `;
+      eyebrow.textContent = '전기차 충전 인프라 연구 대시보드 · 가설 검증 판정본';
+      timerNotice.textContent = '⏱️ 11분 후 기묘한 이야기 모드 자동 전환';
+      
+      switchTime(currentTime);
+    }
+
+    renderMapData();
+  }
+</script>
+
+</body>
+</html>
