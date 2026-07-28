@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>낮과 밤의 부산 전기차 충전 지도 | 연구 대시보드</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
   :root {
     --ink: #1b1f23;
@@ -364,16 +363,12 @@
     background: #eef0ee;
     position: relative;
     z-index: 1;
-    transition: filter 0.4s ease, background 0.4s ease;
+    transition: background 0.4s ease;
   }
   #map.night-mode {
     background: #0f172a;
   }
-  #map.night-mode .leaflet-tile-pane {
-    filter: invert(100%) hue-rotate(190deg) brightness(85%) contrast(120%) saturate(150%);
-  }
 
-  /* SVG 지도를 위한 포올백 컨테이너 */
   .svg-map-fallback {
     width: 100%;
     height: 100%;
@@ -443,9 +438,6 @@
   }
   .facts-list li {
     margin-bottom: 6px;
-  }
-  .facts-list li:last-child {
-    margin-bottom: 0;
   }
 
   /* ---------- [독립 칸 2] 데이터 기반 충전 인프라 개선 및 활용 제안 ---------- */
@@ -530,15 +522,6 @@
     border-left-color: #38bdf8;
     border-color: #312e81;
   }
-  .proposal.active .pnum {
-    color: var(--sub-accent);
-  }
-  .proposal.active .toggle-icon {
-    transform: rotate(180deg);
-  }
-  .proposal.active .ptext-details {
-    display: block;
-  }
 
   /* ---------- [독립 칸 3] 흥미로운 숨겨진 발견 (Data Insights) ---------- */
   .insights-section {
@@ -573,10 +556,6 @@
   }
   .insight-card:hover {
     transform: translateY(-2px);
-  }
-  .insight-icon {
-    font-size: 24px;
-    margin-bottom: 8px;
   }
   .insight-title {
     font-size: 14px;
@@ -627,12 +606,6 @@
   .limit-list {
     margin: 0;
     padding-left: 18px;
-  }
-  .limit-list li {
-    margin-bottom: 4px;
-  }
-  .limit-list li:last-child {
-    margin-bottom: 0;
   }
 
   .sources {
@@ -836,7 +809,7 @@
       </div>
       <div class="ptext-details">
         주가설 분석 결과, 상업·업무시설 밀집 구(중구·동구·사상구 등)는 낮 시간대 단시간 주차 차량의 충전 이용량이 집중됩니다. 
-        이 지역에는 장시간 주차형 완속 충전기보다 20~30분 내 빠른 충전이 가능한 **초급속 충전 스파팟(Hub)**을 공영주차장 및 업무지구 빌딩 주변에 우선적으로 설치하여 회전율을 극대화해야 합니다.
+        이 지역에는 장시간 주차형 완속 충전기보다 20~30분 내 빠른 충전이 가능한 <b>초급속 충전 스파팟(Hub)</b>을 공영주차장 및 업무지구 빌딩 주변에 우선적으로 설치하여 회전율을 극대화해야 합니다.
       </div>
     </div>
 
@@ -874,7 +847,6 @@
   <h2>🔍 대시보드 데이터 속 뜻밖의 흥미로운 사실 2가지</h2>
   <div class="insight-grid">
     <div class="insight-card">
-      <div class="insight-icon">🔍</div>
       <div class="insight-title">1. "충전기 최다 보유 구"라고 가장 잘 충전되는 건 아니다?</div>
       <div class="insight-desc">
         해운대구(3,850개)와 부산진구(3,420개)는 충전기가 가장 많은 1, 2위이지만, 정작 낮 시간대 이용률은 중구(58%)나 동구(52%)보다 훨씬 낮습니다. 충전기 수만 많다고 해서 특정 시간대 이용 편의성이 무조건 높은 것은 아닙니다.
@@ -882,7 +854,6 @@
     </div>
 
     <div class="insight-card">
-      <div class="insight-icon">🚗</div>
       <div class="insight-title">2. 외곽지역(강서구·기장군)의 숨은 낮 시간대 충전 수요</div>
       <div class="insight-desc">
         도심 중심지가 아닌 외곽인 강서구와 기장군이 낮 시간대 이용률 상위권(35~38%)에 위치합니다. 이는 산업단지 출퇴근 차량과 외곽 방문 유동 차량의 장거리 이동 전 충전 수요가 예상외로 매우 크다는 것을 보여줍니다.
@@ -929,113 +900,33 @@
   </div>
 </footer>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
-  let map, markersGroup;
   let currentTime = 'day';
 
   // 부산 구/군별 위치 및 가동률 통계 데이터
   const busanDistrictData = [
-    { 시군구: "중구",     x: 52, y: 78, lat: 35.1062, lng: 129.0324, 총충전기수: 1120, dayCount: 1420, dayRate: 58.2, nightRate: 14.5 },
-    { 시군구: "동구",     x: 56, y: 70, lat: 35.1293, lng: 129.0454, 총충전기수: 980,  dayCount: 1280, dayRate: 52.8, nightRate: 18.1 },
-    { 시군구: "사상구",   x: 38, y: 58, lat: 35.1528, lng: 128.9912, 총충전기수: 1820, dayCount: 1650, dayRate: 44.5, nightRate: 25.6 },
-    { 시군구: "부산진구", x: 58, y: 55, lat: 35.1600, lng: 129.0556, 총충전기수: 3420, dayCount: 1580, dayRate: 41.2, nightRate: 31.0 },
-    { 시군구: "기장군",   x: 88, y: 25, lat: 35.2447, lng: 129.2223, 총충전기수: 2210, dayCount: 1150, dayRate: 38.9, nightRate: 22.5 },
-    { 시군구: "해운대구", x: 78, y: 52, lat: 35.1631, lng: 129.1636, 총충전기수: 3850, dayCount: 980,  dayRate: 28.5, nightRate: 42.1 },
-    { 시군구: "강서구",   x: 22, y: 48, lat: 35.1798, lng: 128.9759, 총충전기수: 2980, dayCount: 890,  dayRate: 35.0, nightRate: 21.0 },
-    { 시군구: "남구",     x: 65, y: 68, lat: 35.1365, lng: 129.0842, 총충전기수: 2710, dayCount: 780,  dayRate: 22.4, nightRate: 38.8 },
-    { 시군구: "금정구",   x: 68, y: 22, lat: 35.2430, lng: 129.0921, 총충전기수: 2450, dayCount: 720,  dayRate: 26.5, nightRate: 33.9 },
-    { 시군구: "동래구",   x: 64, y: 38, lat: 35.2048, lng: 129.0786, 총충전기수: 2380, dayCount: 680,  dayRate: 21.0, nightRate: 46.4 },
-    { 시군구: "사하구",   x: 32, y: 78, lat: 35.1044, lng: 128.9749, 총충전기수: 2100, dayCount: 610,  dayRate: 24.3, nightRate: 39.8 },
-    { 시군구: "북구",     x: 38, y: 40, lat: 35.1970, lng: 128.9904, 총충전기수: 1950, dayCount: 540,  dayRate: 18.2, nightRate: 51.0 },
-    { 시군구: "연제구",   x: 65, y: 48, lat: 35.1764, lng: 129.0797, 총충전기수: 1680, dayCount: 490,  dayRate: 25.0, nightRate: 44.1 },
-    { 시군구: "수영구",   x: 72, y: 60, lat: 35.1456, lng: 129.1132, 총충전기수: 1520, dayCount: 450,  dayRate: 31.2, nightRate: 43.0 },
-    { 시군구: "서구",     x: 48, y: 82, lat: 35.0979, lng: 129.0244, 총충전기수: 910,  dayCount: 420,  dayRate: 41.0, nightRate: 20.9 },
-    { 시군구: "영도구",   x: 60, y: 88, lat: 35.0912, lng: 129.0678, 총충전기수: 850,  dayCount: 310,  dayRate: 23.1, nightRate: 29.8 }
+    { 시군구: "중구",     x: 52, y: 78, 총충전기수: 1120, dayCount: 1420, dayRate: 58.2, nightRate: 14.5 },
+    { 시군구: "동구",     x: 56, y: 70, 총충전기수: 980,  dayCount: 1280, dayRate: 52.8, nightRate: 18.1 },
+    { 시군구: "사상구",   x: 38, y: 58, 총충전기수: 1820, dayCount: 1650, dayRate: 44.5, nightRate: 25.6 },
+    { 시군구: "부산진구", x: 58, y: 55, 총충전기수: 3420, dayCount: 1580, dayRate: 41.2, nightRate: 31.0 },
+    { 시군구: "기장군",   x: 88, y: 25, 총충전기수: 2210, dayCount: 1150, dayRate: 38.9, nightRate: 22.5 },
+    { 시군구: "해운대구", x: 78, y: 52, 총충전기수: 3850, dayCount: 980,  dayRate: 28.5, nightRate: 42.1 },
+    { 시군구: "강서구",   x: 22, y: 48, 총충전기수: 2980, dayCount: 890,  dayRate: 35.0, nightRate: 21.0 },
+    { 시군구: "남구",     x: 65, y: 68, 총충전기수: 2710, dayCount: 780,  dayRate: 22.4, nightRate: 38.8 },
+    { 시군구: "금정구",   x: 68, y: 22, 총충전기수: 2450, dayCount: 720,  dayRate: 26.5, nightRate: 33.9 },
+    { 시군구: "동래구",   x: 64, y: 38, 총충전기수: 2380, dayCount: 680,  dayRate: 21.0, nightRate: 46.4 },
+    { 시군구: "사하구",   x: 32, y: 78, 총충전기수: 2100, dayCount: 610,  dayRate: 24.3, nightRate: 39.8 },
+    { 시군구: "북구",     x: 38, y: 40, 총충전기수: 1950, dayCount: 540,  dayRate: 18.2, nightRate: 51.0 },
+    { 시군구: "연제구",   x: 65, y: 48, 총충전기수: 1680, dayCount: 490,  dayRate: 25.0, nightRate: 44.1 },
+    { 시군구: "수영구",   x: 72, y: 60, 총충전기수: 1520, dayCount: 450,  dayRate: 31.2, nightRate: 43.0 },
+    { 시군구: "서구",     x: 48, y: 82, 총충전기수: 910,  dayCount: 420,  dayRate: 41.0, nightRate: 20.9 },
+    { 시군구: "영도구",   x: 60, y: 88, 총충전기수: 850,  dayCount: 310,  dayRate: 23.1, nightRate: 29.8 }
   ];
-
-  window.addEventListener('DOMContentLoaded', () => {
-    initDashboardMap();
-
-    // 제안 카드 클릭 토글 (상세내용 열기/닫기)
-    document.querySelectorAll('.proposal').forEach(card => {
-      card.addEventListener('click', () => {
-        card.classList.toggle('active');
-        const icon = card.querySelector('.toggle-icon');
-        if (card.classList.contains('active')) {
-          icon.textContent = '▲ 닫기';
-        } else {
-          icon.textContent = '▼ 상세보기';
-        }
-      });
-    });
-  });
-
-  function initDashboardMap() {
-    const mapContainer = document.getElementById('map');
-    
-    // Leaflet 타일 지도가 정상 지원되는 경우 초기화, 예외 발생 시 SVG 지도 자동 스위칭
-    if (typeof L !== 'undefined') {
-      try {
-        const busanBounds = L.latLngBounds([34.87, 128.73], [35.42, 129.33]);
-        map = L.map('map', {
-          scrollWheelZoom: false,
-          maxBounds: busanBounds,
-          maxBoundsViscosity: 1.0,
-          minZoom: 10
-        });
-        
-        map.fitBounds(busanBounds);
-        
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 18,
-          minZoom: 10,
-          attribution: '&copy; OpenStreetMap'
-        }).addTo(map);
-
-        markersGroup = L.layerGroup().addTo(map);
-        renderLeafletData();
-        return;
-      } catch(e) {
-        console.warn("Leaflet Map fallback triggered:", e);
-      }
-    }
-
-    // 포올백: 외부 네트워크 제한 시에도 100% 렌더링을 보장하는 SVG 벡터 지도
-    renderSvgMap();
-  }
-
-  function renderLeafletData() {
-    if (!markersGroup) return;
-    markersGroup.clearLayers();
-    const maxCount = Math.max(...busanDistrictData.map(r => r.총충전기수));
-
-    busanDistrictData.forEach(r => {
-      const rate = currentTime === 'day' ? r.dayRate : r.nightRate;
-      const radius = 8 + (r.총충전기수 / maxCount) * 28;
-      
-      const strokeColor = currentTime === 'day' ? '#0f6e5c' : '#f43f5e';
-      const fillColor = currentTime === 'day' ? '#0f6e5c' : '#a855f7';
-
-      const circle = L.circleMarker([r.lat, r.lng], {
-        radius: radius,
-        color: strokeColor,
-        weight: currentTime === 'day' ? 2 : 2.5,
-        fillColor: fillColor,
-        fillOpacity: currentTime === 'day' ? 0.4 : 0.7
-      }).addTo(markersGroup);
-
-      circle.bindTooltip(
-        `<b>${r.시군구}</b><br>` +
-        `총 충전기: ${r.총충전기수.toLocaleString()}개<br>` +
-        `<b>[${currentTime === 'day' ? '낮 14시' : '밤 22시'}] 이용률: ${rate}%</b>`,
-        { direction: 'top', offset: [0, -radius] }
-      );
-    });
-  }
 
   function renderSvgMap() {
     const mapContainer = document.getElementById('map');
+    if (!mapContainer) return;
+
     const isNight = currentTime === 'night';
     const bgBg = isNight ? '#0f172a' : '#eef0ee';
     const bubbleColor = isNight ? '#a855f7' : '#0f6e5c';
@@ -1049,13 +940,13 @@
 
     busanDistrictData.forEach(r => {
       const rate = isNight ? r.nightRate : r.dayRate;
-      const radius = 2.5 + (r.총충전기수 / 3850) * 5;
+      const radius = 2.8 + (r.총충전기수 / 3850) * 4.8;
 
       svgHtml += `
         <g style="cursor:pointer;">
-          <circle cx="${r.x}" cy="${r.y}" r="${radius}" fill="${bubbleColor}" fill-opacity="${isNight ? 0.7 : 0.4}" stroke="${strokeColor}" stroke-width="0.5" />
-          <text x="${r.x}" y="${r.y + 0.8}" font-size="2.2" font-weight="bold" text-anchor="middle" fill="${isNight ? '#f1f5f9' : '#1b1f23'}">${r.시군구}</text>
-          <text x="${r.x}" y="${r.y + 3.2}" font-size="1.8" text-anchor="middle" fill="${isNight ? '#38bdf8' : '#0f6e5c'}">${rate}%</text>
+          <circle cx="${r.x}" cy="${r.y}" r="${radius}" fill="${bubbleColor}" fill-opacity="${isNight ? 0.7 : 0.45}" stroke="${strokeColor}" stroke-width="0.5" />
+          <text x="${r.x}" y="${r.y + 0.8}" font-size="2.3" font-weight="bold" text-anchor="middle" fill="${isNight ? '#f1f5f9' : '#1b1f23'}">${r.시군구}</text>
+          <text x="${r.x}" y="${r.y + 3.4}" font-size="1.9" text-anchor="middle" font-weight="600" fill="${isNight ? '#38bdf8' : '#0f6e5c'}">${rate}%</text>
         </g>
       `;
     });
@@ -1066,8 +957,10 @@
 
   function switchTime(time) {
     currentTime = time;
-    document.getElementById('btnDay').classList.toggle('active', time === 'day');
-    document.getElementById('btnNight').classList.toggle('active', time === 'night');
+    const btnDay = document.getElementById('btnDay');
+    const btnNight = document.getElementById('btnNight');
+    if (btnDay) btnDay.classList.toggle('active', time === 'day');
+    if (btnNight) btnNight.classList.toggle('active', time === 'night');
     
     const mapElement = document.getElementById('map');
     const note = document.getElementById('mapNote');
@@ -1076,25 +969,44 @@
 
     if (time === 'day') {
       document.body.classList.remove('dark-theme');
-      mapElement.classList.remove('night-mode');
-      header.classList.remove('night-header');
-      note.classList.remove('night-note');
-      note.innerHTML = '현재 <b>[주간 14:00 이용 건수 및 가동률]</b>이 표시되고 있습니다. 상업·업무 밀집 구(중구, 동구, 사상구, 부산진구)에서 낮 시간대 이용량이 집중됩니다.';
+      if (mapElement) mapElement.classList.remove('night-mode');
+      if (header) header.classList.remove('night-header');
+      if (note) {
+        note.classList.remove('night-note');
+        note.innerHTML = '현재 <b>[주간 14:00 이용 건수 및 가동률]</b>이 표시되고 있습니다. 상업·업무 밀집 구(중구, 동구, 사상구, 부산진구)에서 낮 시간대 이용량이 집중됩니다.';
+      }
       if (titleIndicator) titleIndicator.className = 'title-indicator day-active';
     } else {
       document.body.classList.add('dark-theme');
-      mapElement.classList.add('night-mode');
-      header.classList.add('night-header');
-      note.classList.add('night-note');
-      note.innerHTML = '현재 <b>[야간 22:00 전체 사이트 다크 모드]</b>가 적용되어 있습니다. 보라/핑크빛 네온 버블로 주거 밀집 구(북구, 동래구, 연제구, 수영구)의 야간 충전 수요를 나타냅니다.';
+      if (mapElement) mapElement.classList.add('night-mode');
+      if (header) header.classList.add('night-header');
+      if (note) {
+        note.classList.add('night-note');
+        note.innerHTML = '현재 <b>[야간 22:00 전체 사이트 다크 모드]</b>가 적용되어 있습니다. 보라/핑크빛 네온 버블로 주거 밀집 구(북구, 동래구, 연제구, 수영구)의 야간 충전 수요를 나타냅니다.';
+      }
       if (titleIndicator) titleIndicator.className = 'title-indicator night-active';
     }
 
-    if (typeof L !== 'undefined' && map && markersGroup) {
-      renderLeafletData();
-    } else {
-      renderSvgMap();
-    }
+    renderSvgMap();
+  }
+
+  function setupEvents() {
+    renderSvgMap();
+    document.querySelectorAll('.proposal').forEach(card => {
+      card.addEventListener('click', () => {
+        card.classList.toggle('active');
+        const icon = card.querySelector('.toggle-icon');
+        if (icon) {
+          icon.textContent = card.classList.contains('active') ? '▲ 닫기' : '▼ 상세보기';
+        }
+      });
+    });
+  }
+
+  if (document.readyState === 'interactive' || document.readyState === 'complete') {
+    setupEvents();
+  } else {
+    document.addEventListener('DOMContentLoaded', setupEvents);
   }
 </script>
 
