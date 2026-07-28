@@ -1,259 +1,4 @@
 
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>낮과 밤의 부산 전기차 충전 지도 | 연구 대시보드</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<style>
-  :root {
-    --ink: #1b1f23;
-    --paper: #fafaf8;
-    --card-bg: #ffffff;
-    --line: #dcdcd6;
-    --accent: #0f6e5c;
-    --sub-accent: #2b5da1;
-    --muted: #6b6f76;
-    --box-bg: #fbfaf6;
-    --fun-bg: #fdfbf7;
-    --fun-accent: #d97706;
-  }
-
-  /* 사이트 전체 다크 모드 변수 정의 */
-  body.dark-theme {
-    --ink: #f1f5f9;
-    --paper: #0f172a;
-    --card-bg: #1e293b;
-    --line: #334155;
-    --accent: #10b981;
-    --sub-accent: #38bdf8;
-    --muted: #94a3b8;
-    --box-bg: #1e1b4b;
-    --fun-bg: #1c1917;
-    --fun-accent: #f59e0b;
-  }
-
-  /* 붉은 기묘한 이야기(Stranger Things / Upside Down) 테마 */
-  body.stranger-theme {
-    --ink: #ff3344;
-    --paper: #050002;
-    --card-bg: #120005;
-    --line: #4a0011;
-    --accent: #ff0033;
-    --sub-accent: #ff6600;
-    --muted: #b33951;
-    --box-bg: #220008;
-    --fun-bg: #1a0006;
-    --fun-accent: #ff0033;
-    animation: strangerFlicker 0.15s infinite alternate;
-  }
-
-  @keyframes strangerFlicker {
-    0% { opacity: 0.98; }
-    100% { opacity: 1; }
-  }
-
-  /* 기묘한 이야기 글로우 텍스트 */
-  body.stranger-theme h1,
-  body.stranger-theme .eyebrow,
-  body.stranger-theme h2 {
-    color: #ff0033 !important;
-    text-shadow: 0 0 8px #ff0033, 0 0 18px #990011, 0 0 30px #e60000;
-    letter-spacing: 0.05em;
-  }
-
-  body.stranger-theme .proposal.active {
-    background: #2a000a;
-    border-left-color: #ff0033;
-    border-color: #660018;
-    box-shadow: 0 0 15px rgba(255, 0, 51, 0.3);
-  }
-
-  /* 기묘한 상단 알림 띠 */
-  #strangerBanner {
-    display: none;
-    background: #ff0033;
-    color: #fff;
-    text-align: center;
-    padding: 10px 16px;
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    box-shadow: 0 0 20px #ff0033;
-    animation: pulse 1.5s infinite;
-  }
-  @keyframes pulse {
-    0% { background-color: #cc0029; }
-    50% { background-color: #ff0033; }
-    100% { background-color: #cc0029; }
-  }
-
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-    background: var(--paper);
-    color: var(--ink);
-    line-height: 1.55;
-    transition: background 0.4s ease, color 0.4s ease;
-  }
-
-  /* ---------- 상단: 제목 + 연구 질문 + 가설 ---------- */
-  header {
-    padding: 40px 24px 30px;
-    border-bottom: 1px solid var(--line);
-    max-width: 960px;
-    margin: 0 auto;
-    transition: border-color 0.4s ease;
-  }
-  .eyebrow {
-    font-size: 13px;
-    letter-spacing: .08em;
-    color: var(--muted);
-    margin-bottom: 10px;
-    text-transform: uppercase;
-    transition: color 0.4s ease;
-  }
-  h1 {
-    font-size: clamp(26px, 4vw, 38px);
-    margin: 0 0 20px;
-    line-height: 1.25;
-    letter-spacing: -0.01em;
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  /* 메인 제목 옆 해와 달 아이콘 상태 제어 CSS */
-  .title-indicator {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin-left: 6px;
-    vertical-align: middle;
-  }
-  .title-indicator .sun-icon, .title-indicator .moon-icon {
-    display: inline-block;
-    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-
-  /* 주간 (라이트 모드): 해가 큼, 달이 작음 */
-  .title-indicator.day-active .sun-icon {
-    font-size: 28px;
-    transform: scale(1.3);
-    filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.85));
-    opacity: 1;
-  }
-  .title-indicator.day-active .moon-icon {
-    font-size: 16px;
-    transform: scale(0.8);
-    opacity: 0.3;
-  }
-
-  /* 야간 (다크 모드): 달이 큼, 해가 작음 */
-  .title-indicator.night-active .sun-icon {
-    font-size: 16px;
-    transform: scale(0.8);
-    opacity: 0.3;
-    filter: none;
-  }
-  .title-indicator.night-active .moon-icon {
-    font-size: 28px;
-    transform: scale(1.3);
-    filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.9));
-    opacity: 1;
-  }
-
-  /* 핵심 연구 질문 카드 */
-  .research-question-box {
-    background: var(--box-bg);
-    border: 1px solid var(--line);
-    border-left: 4px solid var(--fun-accent);
-    padding: 16px 20px;
-    margin-bottom: 20px;
-    border-radius: 4px;
-    transition: background 0.4s ease, border-color 0.4s ease;
-  }
-  .rq-tag {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--fun-accent);
-    letter-spacing: .06em;
-    margin-bottom: 4px;
-  }
-  .rq-text {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--ink);
-    line-height: 1.5;
-  }
-
-  /* 가설 컨테이너 */
-  .hypothesis-container {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-  .hypothesis {
-    background: var(--card-bg);
-    border: 1px solid var(--line);
-    padding: 18px 22px;
-    font-size: 15px;
-    color: var(--ink);
-    transition: background 0.4s ease, border-color 0.4s ease, color 0.4s ease;
-  }
-  .hypothesis.main-hyp {
-    border-left: 4px solid var(--accent);
-  }
-  .hypothesis.sub-hyp {
-    border-left: 4px solid var(--sub-accent);
-  }
-  body:not(.dark-theme):not(.stranger-theme) .hypothesis.sub-hyp {
-    background: #fafcfe;
-  }
-  body.dark-theme .hypothesis.sub-hyp {
-    background: #0f2942;
-  }
-
-  .hypothesis b {
-    display: block;
-    font-size: 12px;
-    letter-spacing: .06em;
-    margin-bottom: 6px;
-    text-transform: uppercase;
-  }
-  .hypothesis.main-hyp b { color: var(--accent); }
-  .hypothesis.sub-hyp b { color: var(--sub-accent); }
-  
-  .hyp-reason {
-    font-size: 13px;
-    color: var(--muted);
-    margin-bottom: 8px;
-    padding-bottom: 8px;
-    border-bottom: 1px dashed var(--line);
-    line-height: 1.5;
-    transition: border-color 0.4s ease, color 0.4s ease;
-  }
-  .hyp-reason span {
-    font-weight: 600;
-    color: var(--ink);
-  }
-
-  /* ---------- 데이터 상태 스트립 ---------- */
-  .status-strip {
-    max-width: 960px;
-    margin: 20px auto 0;
-    padding: 0 24px;
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    font-size: 13px;
-    color: var(--muted);
-    align-items: center;
-  }
-  .status-strip span {
     background: var(--card-bg);
     border: 1px solid var(--line);
     padding: 6px 12px;
@@ -261,25 +6,6 @@
     transition: background 0.4s ease, border-color 0.4s ease;
   }
   .status-strip span.ok { color: var(--accent); border-color: var(--accent); font-weight: 600; }
-
-  /* 기묘한 이야기 모드 즉시 체험 버튼 */
-  .stranger-btn {
-    border: 1px solid #ff0033;
-    background: #2a0008;
-    color: #ff3344;
-    padding: 6px 14px;
-    border-radius: 4px;
-    font-size: 12.5px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    margin-left: auto;
-  }
-  .stranger-btn:hover {
-    background: #ff0033;
-    color: #fff;
-    box-shadow: 0 0 12px #ff0033;
-  }
 
   /* ---------- 가설 검증 현황 패널 ---------- */
   .verdict {
@@ -316,7 +42,6 @@
   }
   .verdict-pill.supported { background: #e5f4ee; color: #0f6e5c; border: 1px solid #b7ded1; }
   body.dark-theme .verdict-pill.supported { background: #064e3b; color: #34d399; border-color: #059669; }
-  body.stranger-theme .verdict-pill.supported { background: #4a0011; color: #ff3344; border-color: #ff0033; }
 
   .registered-rule {
     padding: 16px 20px;
@@ -368,7 +93,6 @@
   }
   .criterion .stat.have { background: #e5f4ee; color: #0f6e5c; }
   body.dark-theme .criterion .stat.have { background: #064e3b; color: #34d399; }
-  body.stranger-theme .criterion .stat.have { background: #4a0011; color: #ff3344; }
   .criterion .what { color: var(--ink); line-height: 1.5; }
 
   /* ---------- 시각화 및 컨트롤러 ---------- */
@@ -399,11 +123,6 @@
     color: #e0e7ff;
     border-bottom-color: #312e81;
   }
-  body.stranger-theme .viz-header {
-    background: #2a0008;
-    color: #ff3344;
-    border-bottom-color: #660018;
-  }
   .viz-header b { color: var(--ink); font-weight: 600; }
   .viz-header.night-header b { color: #f43f5e; }
   
@@ -417,9 +136,6 @@
   }
   body.dark-theme .time-toggle {
     background: #0f172a;
-  }
-  body.stranger-theme .time-toggle {
-    background: #120005;
   }
   .time-btn {
     border: none;
@@ -442,16 +158,12 @@
     color: #ffffff;
     box-shadow: 0 2px 6px rgba(6, 182, 212, 0.4);
   }
-  body.stranger-theme .time-btn.active {
-    background: #ff0033;
-    color: #fff;
-    box-shadow: 0 0 10px #ff0033;
-  }
 
   #map {
     width: 100%;
     height: 460px;
     background: #eef0ee;
+    position: relative;
     z-index: 1;
     transition: filter 0.4s ease, background 0.4s ease;
   }
@@ -462,12 +174,18 @@
     filter: invert(100%) hue-rotate(190deg) brightness(85%) contrast(120%) saturate(150%);
   }
 
-  /* 기묘한 이야기 지도의 업사이드 다운 필터 */
-  #map.stranger-mode {
-    background: #050002;
+  /* SVG 지도를 위한 포올백 컨테이너 */
+  .svg-map-fallback {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #eef0ee;
+    transition: background 0.4s ease;
   }
-  #map.stranger-mode .leaflet-tile-pane {
-    filter: invert(100%) sepia(100%) hue-rotate(300deg) saturate(600%) contrast(180%) brightness(75%);
+  body.dark-theme .svg-map-fallback {
+    background: #0f172a;
   }
 
   .map-note {
@@ -482,11 +200,6 @@
     background: #0f172a;
     color: #cbd5e1;
     border-top: 1px solid #1e293b;
-  }
-  body.stranger-theme .map-note {
-    background: #120005;
-    color: #ff8899;
-    border-top: 1px solid #4a0011;
   }
 
   /* ---------- [독립 칸 1] 연구 결론 섹션 ---------- */
@@ -695,7 +408,6 @@
     transition: border-color 0.4s ease;
   }
 
-  /* 연구 한계 요약 박스 (1번, 2번 구분을 깔끔하게 적용) */
   .limit-card {
     background: var(--card-bg);
     border: 1px solid var(--line);
@@ -751,10 +463,6 @@
     color: var(--muted);
     text-decoration: none;
   }
-  .source-card .url-source a:hover {
-    text-decoration: underline;
-    color: var(--accent);
-  }
 
   .badge {
     display: inline-block;
@@ -767,7 +475,6 @@
   }
   .badge.done { background: #e5f4ee; color: #0f6e5c; }
   body.dark-theme .badge.done { background: #064e3b; color: #34d399; }
-  body.stranger-theme .badge.done { background: #4a0011; color: #ff3344; }
 
   @media (max-width: 768px) {
     .sources { grid-template-columns: repeat(2, 1fr); }
@@ -781,11 +488,6 @@
 </style>
 </head>
 <body>
-
-<!-- 기묘한 이야기 모드 경고 배너 -->
-<div id="strangerBanner">
-  ⚠️ 경고: 대시보드 켜짐 11분 경과 — 기묘한 이야기 (UPSIDE DOWN) 모드가 발동되었습니다!
-</div>
 
 <header>
   <div class="eyebrow" id="headerEyebrow">전기차 충전 인프라 연구 대시보드 · 가설 검증 판정본</div>
@@ -887,8 +589,7 @@
 
 <div class="status-strip" id="statusStrip">
   <span class="ok">✓ 가설 검증 결과 및 웹 대시보드 업데이트 완료</span>
-  <span id="timerNotice">⏱️ 11분 후 기묘한 이야기 모드 자동 전환</span>
-  <button class="stranger-btn" onclick="triggerStrangerThings()">🔮 기묘한 모드 즉시 체험</button>
+  <span>데이터 수집 기준: 2025~2026년 최신 통계</span>
 </div>
 
 <main>
@@ -993,7 +694,6 @@
 
 <footer>
   <h2>연구 한계 및 데이터 출처</h2>
-  <!-- 연구 한계 1번, 2번 명확히 구분 -->
   <div class="limit-card">
     <div class="limit-title">⚠️ 본 연구의 주요 한계점</div>
     <ol class="limit-list">
@@ -1007,25 +707,25 @@
       <span class="badge done">확보완료</span>
       <div class="name">한국스마트그리드협회 · 차지인포</div>
       <div class="meta">부산광역시 전기차 등록 현황 통계 (2025년)</div>
-      <div class="url-source">🔗 출처: <a href="https://www.ksga.org" target="_blank">ksga.org (2025 스마트그리드 통계)</a></div>
+      <div class="url-source">🔗 출처: <a href="https://www.ksga.org" target="_blank">ksga.org (2025)</a></div>
     </div>
     <div class="source-card">
       <span class="badge done">확보완료</span>
       <div class="name">EV-무공해차 통합누리집</div>
       <div class="meta">부산시 구별 충전소 실시간 상태 및 이용 이력 (2026년)</div>
-      <div class="url-source">🔗 출처: <a href="https://www.ev.or.kr" target="_blank">ev.or.kr (2026 환경부 무공해차)</a></div>
+      <div class="url-source">🔗 출처: <a href="https://www.ev.or.kr" target="_blank">ev.or.kr (2026)</a></div>
     </div>
     <div class="source-card">
       <span class="badge done">확보완료</span>
       <div class="name">통계청 인구주택총조사</div>
       <div class="meta">부산시 구별 토지이용 밀도 및 공동주택 거주 비율 (2026년)</div>
-      <div class="url-source">🔗 출처: <a href="https://kostat.go.kr" target="_blank">kostat.go.kr (2026 국가통계포털)</a></div>
+      <div class="url-source">🔗 출처: <a href="https://kostat.go.kr" target="_blank">kostat.go.kr (2026)</a></div>
     </div>
     <div class="source-card">
       <span class="badge done">확보완료</span>
       <div class="name">한국환경공단 전기차 충전소 API</div>
       <div class="meta">전국 전기자동차 충전소 상태 정보 (2026년 연간 갱신)</div>
-      <div class="url-source">🔗 출처: <a href="https://www.data.go.kr/data/15076352/openapi.do" target="_blank">data.go.kr (2026 Open API)</a></div>
+      <div class="url-source">🔗 출처: <a href="https://www.data.go.kr/data/15076352/openapi.do" target="_blank">data.go.kr (2026)</a></div>
     </div>
   </div>
 </footer>
@@ -1034,49 +734,29 @@
 <script>
   let map, markersGroup;
   let currentTime = 'day';
-  let isStrangerMode = false;
 
-  // 부산 구/군별 분석 데이터
+  // 부산 구/군별 위치 및 가동률 통계 데이터
   const busanDistrictData = [
-    { 시군구: "중구",     lat: 35.1062, lng: 129.0324, 총충전기수: 1120, dayCount: 1420, dayRate: 58.2, nightRate: 14.5 },
-    { 시군구: "동구",     lat: 35.1293, lng: 129.0454, 총충전기수: 980,  dayCount: 1280, dayRate: 52.8, nightRate: 18.1 },
-    { 시군구: "사상구",   lat: 35.1528, lng: 128.9912, 총충전기수: 1820, dayCount: 1650, dayRate: 44.5, nightRate: 25.6 },
-    { 시군구: "부산진구", lat: 35.1600, lng: 129.0556, 총충전기수: 3420, dayCount: 1580, dayRate: 41.2, nightRate: 31.0 },
-    { 시군구: "기장군",   lat: 35.2447, lng: 129.2223, 총충전기수: 2210, dayCount: 1150, dayRate: 38.9, nightRate: 22.5 },
-    { 시군구: "해운대구", lat: 35.1631, lng: 129.1636, 총충전기수: 3850, dayCount: 980,  dayRate: 28.5, nightRate: 42.1 },
-    { 시군구: "강서구",   lat: 35.1798, lng: 128.9759, 총충전기수: 2980, dayCount: 890,  dayRate: 35.0, nightRate: 21.0 },
-    { 시군구: "남구",     lat: 35.1365, lng: 129.0842, 총충전기수: 2710, dayCount: 780,  dayRate: 22.4, nightRate: 38.8 },
-    { 시군구: "금정구",   lat: 35.2430, lng: 129.0921, 총충전기수: 2450, dayCount: 720,  dayRate: 26.5, nightRate: 33.9 },
-    { 시군구: "동래구",   lat: 35.2048, lng: 129.0786, 총충전기수: 2380, dayCount: 680,  dayRate: 21.0, nightRate: 46.4 },
-    { 시군구: "사하구",   lat: 35.1044, lng: 128.9749, 총충전기수: 2100, dayCount: 610,  dayRate: 24.3, nightRate: 39.8 },
-    { 시군구: "북구",     lat: 35.1970, lng: 128.9904, 총충전기수: 1950, dayCount: 540,  dayRate: 18.2, nightRate: 51.0 },
-    { 시군구: "연제구",   lat: 35.1764, lng: 129.0797, 총충전기수: 1680, dayCount: 490,  dayRate: 25.0, nightRate: 44.1 },
-    { 시군구: "수영구",   lat: 35.1456, lng: 129.1132, 총충전기수: 1520, dayCount: 450,  dayRate: 31.2, nightRate: 43.0 },
-    { 시군구: "서구",     lat: 35.0979, lng: 129.0244, 총충전기수: 910,  dayCount: 420,  dayRate: 41.0, nightRate: 20.9 },
-    { 시군구: "영도구",   lat: 35.0912, lng: 129.0678, 총충전기수: 850,  dayCount: 310,  dayRate: 23.1, nightRate: 29.8 }
+    { 시군구: "중구",     x: 52, y: 78, lat: 35.1062, lng: 129.0324, 총충전기수: 1120, dayCount: 1420, dayRate: 58.2, nightRate: 14.5 },
+    { 시군구: "동구",     x: 56, y: 70, lat: 35.1293, lng: 129.0454, 총충전기수: 980,  dayCount: 1280, dayRate: 52.8, nightRate: 18.1 },
+    { 시군구: "사상구",   x: 38, y: 58, lat: 35.1528, lng: 128.9912, 총충전기수: 1820, dayCount: 1650, dayRate: 44.5, nightRate: 25.6 },
+    { 시군구: "부산진구", x: 58, y: 55, lat: 35.1600, lng: 129.0556, 총충전기수: 3420, dayCount: 1580, dayRate: 41.2, nightRate: 31.0 },
+    { 시군구: "기장군",   x: 88, y: 25, lat: 35.2447, lng: 129.2223, 총충전기수: 2210, dayCount: 1150, dayRate: 38.9, nightRate: 22.5 },
+    { 시군구: "해운대구", x: 78, y: 52, lat: 35.1631, lng: 129.1636, 총충전기수: 3850, dayCount: 980,  dayRate: 28.5, nightRate: 42.1 },
+    { 시군구: "강서구",   x: 22, y: 48, lat: 35.1798, lng: 128.9759, 총충전기수: 2980, dayCount: 890,  dayRate: 35.0, nightRate: 21.0 },
+    { 시군구: "남구",     x: 65, y: 68, lat: 35.1365, lng: 129.0842, 총충전기수: 2710, dayCount: 780,  dayRate: 22.4, nightRate: 38.8 },
+    { 시군구: "금정구",   x: 68, y: 22, lat: 35.2430, lng: 129.0921, 총충전기수: 2450, dayCount: 720,  dayRate: 26.5, nightRate: 33.9 },
+    { 시군구: "동래구",   x: 64, y: 38, lat: 35.2048, lng: 129.0786, 총충전기수: 2380, dayCount: 680,  dayRate: 21.0, nightRate: 46.4 },
+    { 시군구: "사하구",   x: 32, y: 78, lat: 35.1044, lng: 128.9749, 총충전기수: 2100, dayCount: 610,  dayRate: 24.3, nightRate: 39.8 },
+    { 시군구: "북구",     x: 38, y: 40, lat: 35.1970, lng: 128.9904, 총충전기수: 1950, dayCount: 540,  dayRate: 18.2, nightRate: 51.0 },
+    { 시군구: "연제구",   x: 65, y: 48, lat: 35.1764, lng: 129.0797, 총충전기수: 1680, dayCount: 490,  dayRate: 25.0, nightRate: 44.1 },
+    { 시군구: "수영구",   x: 72, y: 60, lat: 35.1456, lng: 129.1132, 총충전기수: 1520, dayCount: 450,  dayRate: 31.2, nightRate: 43.0 },
+    { 시군구: "서구",     x: 48, y: 82, lat: 35.0979, lng: 129.0244, 총충전기수: 910,  dayCount: 420,  dayRate: 41.0, nightRate: 20.9 },
+    { 시군구: "영도구",   x: 60, y: 88, lat: 35.0912, lng: 129.0678, 총충전기수: 850,  dayCount: 310,  dayRate: 23.1, nightRate: 29.8 }
   ];
 
   window.addEventListener('DOMContentLoaded', () => {
-    const busanBounds = L.latLngBounds([34.87, 128.73], [35.42, 129.33]);
-    
-    map = L.map('map', {
-      scrollWheelZoom: false,
-      maxBounds: busanBounds,
-      maxBoundsViscosity: 1.0,
-      minZoom: 10
-    });
-    
-    map.fitBounds(busanBounds);
-    
-    // 한국어 지명을 지원하는 OpenStreetMap 기본 타일 적용
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 18,
-      minZoom: 10,
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-
-    markersGroup = L.layerGroup().addTo(map);
-    renderMapData();
+    initDashboardMap();
 
     // 제안 카드 클릭 토글 (상세내용 열기/닫기)
     document.querySelectorAll('.proposal').forEach(card => {
@@ -1090,17 +770,44 @@
         }
       });
     });
-
-    // 11분 타이머 설정 (11분 = 660,000 밀리초)
-    const STRANGER_TIMEOUT = 11 * 60 * 1000;
-    setTimeout(() => {
-      if (!isStrangerMode) {
-        triggerStrangerThings();
-      }
-    }, STRANGER_TIMEOUT);
   });
 
-  function renderMapData() {
+  function initDashboardMap() {
+    const mapContainer = document.getElementById('map');
+    
+    // Leaflet 타일 지도가 정상 지원되는 경우 초기화, 예외 발생 시 SVG 지도 자동 스위칭
+    if (typeof L !== 'undefined') {
+      try {
+        const busanBounds = L.latLngBounds([34.87, 128.73], [35.42, 129.33]);
+        map = L.map('map', {
+          scrollWheelZoom: false,
+          maxBounds: busanBounds,
+          maxBoundsViscosity: 1.0,
+          minZoom: 10
+        });
+        
+        map.fitBounds(busanBounds);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 18,
+          minZoom: 10,
+          attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+
+        markersGroup = L.layerGroup().addTo(map);
+        renderLeafletData();
+        return;
+      } catch(e) {
+        console.warn("Leaflet Map fallback triggered:", e);
+      }
+    }
+
+    // 포올백: 외부 네트워크 제한 시에도 100% 렌더링을 보장하는 SVG 벡터 지도
+    renderSvgMap();
+  }
+
+  function renderLeafletData() {
+    if (!markersGroup) return;
     markersGroup.clearLayers();
     const maxCount = Math.max(...busanDistrictData.map(r => r.총충전기수));
 
@@ -1108,35 +815,57 @@
       const rate = currentTime === 'day' ? r.dayRate : r.nightRate;
       const radius = 8 + (r.총충전기수 / maxCount) * 28;
       
-      let strokeColor = currentTime === 'day' ? '#0f6e5c' : '#f43f5e';
-      let fillColor = currentTime === 'day' ? '#0f6e5c' : '#a855f7';
-
-      if (isStrangerMode) {
-        strokeColor = '#ff0033';
-        fillColor = '#ff0033';
-      }
+      const strokeColor = currentTime === 'day' ? '#0f6e5c' : '#f43f5e';
+      const fillColor = currentTime === 'day' ? '#0f6e5c' : '#a855f7';
 
       const circle = L.circleMarker([r.lat, r.lng], {
         radius: radius,
         color: strokeColor,
-        weight: currentTime === 'day' && !isStrangerMode ? 2 : 2.5,
+        weight: currentTime === 'day' ? 2 : 2.5,
         fillColor: fillColor,
-        fillOpacity: isStrangerMode ? 0.8 : (currentTime === 'day' ? 0.4 : 0.7)
+        fillOpacity: currentTime === 'day' ? 0.4 : 0.7
       }).addTo(markersGroup);
 
       circle.bindTooltip(
         `<b>${r.시군구}</b><br>` +
         `총 충전기: ${r.총충전기수.toLocaleString()}개<br>` +
-        `낮 이용 건수: ${r.dayCount.toLocaleString()}건<br>` +
         `<b>[${currentTime === 'day' ? '낮 14시' : '밤 22시'}] 이용률: ${rate}%</b>`,
         { direction: 'top', offset: [0, -radius] }
       );
     });
   }
 
-  function switchTime(time) {
-    if (isStrangerMode) return; // 기묘한 모드일 때는 주야간 토글 고정
+  function renderSvgMap() {
+    const mapContainer = document.getElementById('map');
+    const isNight = currentTime === 'night';
+    const bgBg = isNight ? '#0f172a' : '#eef0ee';
+    const bubbleColor = isNight ? '#a855f7' : '#0f6e5c';
+    const strokeColor = isNight ? '#f43f5e' : '#0f6e5c';
 
+    let svgHtml = `<div class="svg-map-fallback" style="background:${bgBg}">
+      <svg viewBox="0 0 100 100" style="width:100%; height:100%; max-height:460px;">
+        <!-- 부산시 해안선 스타일 가이드라인 -->
+        <path d="M 15 45 Q 35 60 55 70 T 90 30" fill="none" stroke="${isNight ? '#334155' : '#cbd5e1'}" stroke-width="0.8" stroke-dasharray="2,2"/>
+    `;
+
+    busanDistrictData.forEach(r => {
+      const rate = isNight ? r.nightRate : r.dayRate;
+      const radius = 2.5 + (r.총충전기수 / 3850) * 5;
+
+      svgHtml += `
+        <g style="cursor:pointer;">
+          <circle cx="${r.x}" cy="${r.y}" r="${radius}" fill="${bubbleColor}" fill-opacity="${isNight ? 0.7 : 0.4}" stroke="${strokeColor}" stroke-width="0.5" />
+          <text x="${r.x}" y="${r.y + 0.8}" font-size="2.2" font-weight="bold" text-anchor="middle" fill="${isNight ? '#f1f5f9' : '#1b1f23'}">${r.시군구}</text>
+          <text x="${r.x}" y="${r.y + 3.2}" font-size="1.8" text-anchor="middle" fill="${isNight ? '#38bdf8' : '#0f6e5c'}">${rate}%</text>
+        </g>
+      `;
+    });
+
+    svgHtml += `</svg></div>`;
+    mapContainer.innerHTML = svgHtml;
+  }
+
+  function switchTime(time) {
     currentTime = time;
     document.getElementById('btnDay').classList.toggle('active', time === 'day');
     document.getElementById('btnNight').classList.toggle('active', time === 'night');
@@ -1152,64 +881,21 @@
       header.classList.remove('night-header');
       note.classList.remove('night-note');
       note.innerHTML = '현재 <b>[주간 14:00 이용 건수 및 가동률]</b>이 표시되고 있습니다. 상업·업무 밀집 구(중구, 동구, 사상구, 부산진구)에서 낮 시간대 이용량이 집중됩니다.';
-      
-      // 메인 제목 옆 인디케이터 (낮: 해가 큼, 달이 작음)
-      titleIndicator.className = 'title-indicator day-active';
+      if (titleIndicator) titleIndicator.className = 'title-indicator day-active';
     } else {
       document.body.classList.add('dark-theme');
       mapElement.classList.add('night-mode');
       header.classList.add('night-header');
       note.classList.add('night-note');
-      note.innerHTML = '현재 <b>[야간 22:00 전체 사이트 다크 모드]</b>가 적용되어 있습니다. 지도의 한글명을 유지하면서 보라/핑크빛 네온 버블로 주거 밀집 구(북구, 동래구, 연제구, 수영구)의 야간 충전 수요를 나타냅니다.';
-      
-      // 메인 제목 옆 인디케이터 (밤: 달이 큼, 해가 작음)
-      titleIndicator.className = 'title-indicator night-active';
+      note.innerHTML = '현재 <b>[야간 22:00 전체 사이트 다크 모드]</b>가 적용되어 있습니다. 보라/핑크빛 네온 버블로 주거 밀집 구(북구, 동래구, 연제구, 수영구)의 야간 충전 수요를 나타냅니다.';
+      if (titleIndicator) titleIndicator.className = 'title-indicator night-active';
     }
 
-    renderMapData();
-  }
-
-  // 기묘한 이야기 모드 발동 함수
-  function triggerStrangerThings() {
-    isStrangerMode = !isStrangerMode;
-    const body = document.body;
-    const mapElement = document.getElementById('map');
-    const banner = document.getElementById('strangerBanner');
-    const title = document.getElementById('headerTitle');
-    const eyebrow = document.getElementById('headerEyebrow');
-    const note = document.getElementById('mapNote');
-    const timerNotice = document.getElementById('timerNotice');
-
-    if (isStrangerMode) {
-      body.classList.remove('dark-theme');
-      body.classList.add('stranger-theme');
-      mapElement.classList.remove('night-mode');
-      mapElement.classList.add('stranger-mode');
-
-      banner.style.display = 'block';
-      title.innerHTML = '⚡ 기묘한 이야기: 충전소의 뒤집힌 세계 (UPSIDE DOWN)';
-      eyebrow.textContent = 'STRANGER CHARGERS · 11분 경과 붉은 노이즈 테마';
-      note.innerHTML = '⚠️ <b>[UPSIDE DOWN MODE]</b> 대시보드 접속 후 11분이 경과하여 기묘한 이야기 모드가 활성화되었습니다. 지도와 인프라 버블이 붉은 핏빛 네온으로 빛납니다.';
-      timerNotice.textContent = '🔮 기묘한 이야기 모드 작동 중';
+    if (typeof L !== 'undefined' && map && markersGroup) {
+      renderLeafletData();
     } else {
-      body.classList.remove('stranger-theme');
-      mapElement.classList.remove('stranger-mode');
-
-      banner.style.display = 'none';
-      title.innerHTML = `
-        <span>낮과 밤의 부산 전기차 충전 지도</span>
-        <span id="titleIndicator" class="title-indicator ${currentTime === 'day' ? 'day-active' : 'night-active'}">
-          <span class="sun-icon">☀️</span>
-          <span class="moon-icon">🌙</span>
-        </span>
-      `;
-      eyebrow.textContent = '전기차 충전 인프라 연구 대시보드 · 가설 검증 판정본';
-      timerNotice.textContent = '⏱️ 11분 후 기묘한 이야기 모드 자동 전환';
-      
-      switchTime(currentTime);
+      renderSvgMap();
     }
-
-    renderMapData();
   }
 </script>
 
