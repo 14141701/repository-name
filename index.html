@@ -1,4 +1,203 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>낮과 밤의 부산 전기차 충전 지도 | 연구 대시보드</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root {
+    --ink: #1b1f23;
+    --paper: #fafaf8;
+    --card-bg: #ffffff;
+    --line: #dcdcd6;
+    --accent: #0f6e5c;
+    --sub-accent: #2b5da1;
+    --muted: #6b6f76;
+    --box-bg: #fbfaf6;
+    --fun-bg: #fdfbf7;
+    --fun-accent: #d97706;
+  }
 
+  /* 사이트 전체 다크 모드 변수 정의 */
+  body.dark-theme {
+    --ink: #f1f5f9;
+    --paper: #0f172a;
+    --card-bg: #1e293b;
+    --line: #334155;
+    --accent: #10b981;
+    --sub-accent: #38bdf8;
+    --muted: #94a3b8;
+    --box-bg: #1e1b4b;
+    --fun-bg: #1c1917;
+    --fun-accent: #f59e0b;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.55;
+    transition: background 0.4s ease, color 0.4s ease;
+  }
+
+  /* ---------- 상단: 제목 + 연구 질문 + 가설 ---------- */
+  header {
+    padding: 40px 24px 30px;
+    border-bottom: 1px solid var(--line);
+    max-width: 960px;
+    margin: 0 auto;
+    transition: border-color 0.4s ease;
+  }
+  .eyebrow {
+    font-size: 13px;
+    letter-spacing: .08em;
+    color: var(--muted);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    transition: color 0.4s ease;
+  }
+  h1 {
+    font-size: clamp(26px, 4vw, 38px);
+    margin: 0 0 20px;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* 메인 제목 옆 해와 달 아이콘 상태 제어 CSS */
+  .title-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .title-indicator .sun-icon, .title-indicator .moon-icon {
+    display: inline-block;
+    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  /* 주간 (라이트 모드): 해가 큼, 달이 작음 */
+  .title-indicator.day-active .sun-icon {
+    font-size: 28px;
+    transform: scale(1.3);
+    filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.85));
+    opacity: 1;
+  }
+  .title-indicator.day-active .moon-icon {
+    font-size: 16px;
+    transform: scale(0.8);
+    opacity: 0.3;
+  }
+
+  /* 야간 (다크 모드): 달이 큼, 해가 작음 */
+  .title-indicator.night-active .sun-icon {
+    font-size: 16px;
+    transform: scale(0.8);
+    opacity: 0.3;
+    filter: none;
+  }
+  .title-indicator.night-active .moon-icon {
+    font-size: 28px;
+    transform: scale(1.3);
+    filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.9));
+    opacity: 1;
+  }
+
+  /* 핵심 연구 질문 카드 */
+  .research-question-box {
+    background: var(--box-bg);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--fun-accent);
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+    transition: background 0.4s ease, border-color 0.4s ease;
+  }
+  .rq-tag {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--fun-accent);
+    letter-spacing: .06em;
+    margin-bottom: 4px;
+  }
+  .rq-text {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.5;
+  }
+
+  /* 가설 컨테이너 */
+  .hypothesis-container {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .hypothesis {
+    background: var(--card-bg);
+    border: 1px solid var(--line);
+    padding: 18px 22px;
+    font-size: 15px;
+    color: var(--ink);
+    transition: background 0.4s ease, border-color 0.4s ease, color 0.4s ease;
+  }
+  .hypothesis.main-hyp {
+    border-left: 4px solid var(--accent);
+  }
+  .hypothesis.sub-hyp {
+    border-left: 4px solid var(--sub-accent);
+  }
+  body:not(.dark-theme) .hypothesis.sub-hyp {
+    background: #fafcfe;
+  }
+  body.dark-theme .hypothesis.sub-hyp {
+    background: #0f2942;
+  }
+
+  .hypothesis b {
+    display: block;
+    font-size: 12px;
+    letter-spacing: .06em;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  .hypothesis.main-hyp b { color: var(--accent); }
+  .hypothesis.sub-hyp b { color: var(--sub-accent); }
+  
+  .hyp-reason {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--line);
+    line-height: 1.5;
+    transition: border-color 0.4s ease, color 0.4s ease;
+  }
+  .hyp-reason span {
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  /* ---------- 데이터 상태 스트립 ---------- */
+  .status-strip {
+    max-width: 960px;
+    margin: 20px auto 0;
+    padding: 0 24px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--muted);
+    align-items: center;
+  }
+  .status-strip span {
     background: var(--card-bg);
     border: 1px solid var(--line);
     padding: 6px 12px;
